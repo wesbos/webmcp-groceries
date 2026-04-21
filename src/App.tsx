@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, type DragEvent, type FormEvent } from "react";
+import { useCallback, useEffect, useReducer, useRef, type DragEvent, type FormEvent } from "react";
 import "./App.css";
 
 /* ------------------------------------------------------------------ */
@@ -33,15 +33,18 @@ declare global {
 }
 
 declare module "react" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface FormHTMLAttributes<T> {
     toolname?: string;
     tooldescription?: string;
     toolautosubmit?: boolean | "";
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface InputHTMLAttributes<T> {
     toolparamtitle?: string;
     toolparamdescription?: string;
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface SelectHTMLAttributes<T> {
     toolparamtitle?: string;
     toolparamdescription?: string;
@@ -55,6 +58,7 @@ type GroceryItem = {
   id: string;
   name: string;
   purchased: boolean;
+  removing?: boolean;
 };
 
 type Store = {
@@ -68,6 +72,7 @@ type Store = {
 /* ------------------------------------------------------------------ */
 type Action =
   | { type: "ADD_ITEM"; storeId: string; name: string }
+  | { type: "MARK_REMOVING"; itemId: string }
   | { type: "DELETE_ITEM"; itemId: string }
   | { type: "TOGGLE_PURCHASED"; itemId: string }
   | { type: "MOVE_ITEM"; itemId: string; targetStoreId: string }
@@ -92,6 +97,14 @@ function reducer(stores: Store[], action: Action): Store[] {
             }
           : s
       );
+
+    case "MARK_REMOVING":
+      return stores.map((s) => ({
+        ...s,
+        items: s.items.map((i) =>
+          i.id === action.itemId ? { ...i, removing: true } : i
+        ),
+      }));
 
     case "DELETE_ITEM":
       return stores.map((s) => ({
@@ -203,9 +216,23 @@ export default function App() {
     }
   }
 
+  /* ---- Animated removal ---- */
+  const REMOVE_DURATION = 300; // matches CSS transition duration
+  const removeItem = useCallback(
+    (itemId: string) => {
+      dispatch({ type: "MARK_REMOVING", itemId });
+      setTimeout(() => {
+        dispatch({ type: "DELETE_ITEM", itemId });
+      }, REMOVE_DURATION);
+    },
+    []
+  );
+
   /* ---- Imperative WebMCP query tools ---- */
   const storesRef = useRef(stores);
-  storesRef.current = stores;
+  useEffect(() => {
+    storesRef.current = stores;
+  }, [stores]);
 
   useEffect(() => {
     const mc = navigator.modelContext;
@@ -369,7 +396,7 @@ export default function App() {
       );
       return;
     }
-    dispatch({ type: "DELETE_ITEM", itemId });
+    removeItem(itemId);
     if (native.agentInvoked) {
       native.respondWith?.(
         Promise.resolve({
@@ -540,7 +567,7 @@ export default function App() {
               {store.items.map((item) => (
                 <li
                   key={item.id}
-                  className={`item${item.purchased ? " purchased" : ""}`}
+                  className={`item${item.purchased ? " purchased" : ""}${item.removing ? " removing" : ""}`}
                   draggable
                   onDragStart={(e) => handleDragStart(e, item.id)}
                 >
@@ -556,9 +583,7 @@ export default function App() {
                   </label>
                   <button
                     className="delete-btn"
-                    onClick={() =>
-                      dispatch({ type: "DELETE_ITEM", itemId: item.id })
-                    }
+                    onClick={() => removeItem(item.id)}
                     aria-label={`Delete ${item.name}`}
                   >
                     &times;

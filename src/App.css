@@ -3,19 +3,25 @@
 /* ------------------------------------------------------------------ */
 .app-header {
   text-align: center;
-  padding: 2rem 1rem 1rem;
+  padding: 3rem 1rem 1.5rem;
 }
 
 .app-header h1 {
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: 5rem;
+  font-weight: 900;
   margin: 0;
+  display: inline;
+  background-image: linear-gradient(transparent 60%, var(--yellow) 60%);
+  background-size: 100% 100%;
+  padding: 0 1rem;
 }
 
 .subtitle {
-  margin: 0.25rem 0 0;
-  font-size: 0.875rem;
+  margin: 1rem 0 0;
+  font-size: 1.4rem;
   opacity: 0.6;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 /* ------------------------------------------------------------------ */
@@ -23,8 +29,8 @@
 /* ------------------------------------------------------------------ */
 .board {
   display: flex;
-  gap: 1.25rem;
-  padding: 1.5rem;
+  gap: 2rem;
+  padding: 2rem;
   overflow-x: auto;
   align-items: flex-start;
 }
@@ -35,35 +41,44 @@
 .store-column {
   flex: 1 1 300px;
   min-width: 260px;
-  max-width: 400px;
-  background: var(--column-bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  max-width: 420px;
+  background: var(--light);
+  border: 2.5px solid var(--dark);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: box-shadow 0.2s;
+  box-shadow: 5px 5px 0 var(--dark);
+  /* Smooth column height when items change */
+  interpolate-size: allow-keywords;
+  height: calc-size(auto);
+  transition:
+    height 0.3s ease,
+    box-shadow 0.15s,
+    transform 0.15s;
 }
 
-.store-column:has(.item-list:empty) {
-  min-height: 180px;
+.store-column:hover {
+  box-shadow: 6px 6px 0 var(--dark), 10px 10px 0 var(--yellow);
 }
 
 .store-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.25rem 0.75rem;
+  padding: 1.5rem 1.5rem 1rem;
+  background: var(--dark);
+  color: var(--light);
 }
 
 .store-header h2 {
   margin: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
 }
 
 .item-count {
-  font-size: 0.8rem;
+  font-size: 1.3rem;
   opacity: 0.5;
   font-variant-numeric: tabular-nums;
 }
@@ -74,52 +89,115 @@
 .item-list {
   list-style: none;
   margin: 0;
-  padding: 0 0.75rem;
+  padding: 0.75rem;
   flex: 1;
   min-height: 40px;
+  /* Let the column height animate smoothly when items are added/removed */
+  interpolate-size: allow-keywords;
 }
 
 .item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  margin-bottom: 0.375rem;
-  border-radius: 8px;
-  background: var(--item-bg);
+  gap: 0.75rem;
+  padding: 0.75rem 0.75rem;
+  margin-bottom: 0.5rem;
+  border: 2px solid transparent;
+  background: var(--imGoingToFaint);
   cursor: grab;
-  transition: opacity 0.2s, background 0.15s;
   user-select: none;
+  font-size: 1.6rem;
+
+  /* Animate entry: height from 0 → auto, opacity 0 → 1 */
+  height: calc-size(auto);
+  opacity: 1;
+  overflow: hidden;
+  transition:
+    height 0.3s ease,
+    opacity 0.3s ease,
+    margin-bottom 0.3s ease,
+    padding 0.3s ease,
+    border-color 0.15s,
+    background 0.15s,
+    transform 0.1s;
+}
+
+/* Entry animation — items start from collapsed state */
+@starting-style {
+  .item {
+    height: 0;
+    opacity: 0;
+    padding-block: 0;
+    margin-bottom: 0;
+  }
 }
 
 .item:active {
   cursor: grabbing;
+  transform: rotate(-1deg) scale(1.02);
 }
 
 .item:hover {
-  background: var(--item-hover);
+  border-color: var(--yellow);
+  background: #fff9db;
+}
+
+/* Exit animation — collapsing out */
+.item.removing {
+  height: 0;
+  opacity: 0;
+  padding-block: 0;
+  margin-bottom: 0;
+  border-block-width: 0;
+  pointer-events: none;
+}
+
+.item.purchased {
+  opacity: 0.5;
 }
 
 .item.purchased .item-name {
   text-decoration: line-through;
-  opacity: 0.45;
+  text-decoration-color: var(--yellow);
+  text-decoration-thickness: 3px;
 }
 
 .item-label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
   flex: 1;
   cursor: pointer;
   min-width: 0;
 }
 
 .item-label input[type="checkbox"] {
-  width: 1.1rem;
-  height: 1.1rem;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 2rem;
+  height: 2rem;
   flex-shrink: 0;
-  accent-color: #22c55e;
+  border: 2.5px solid var(--dark);
+  background: var(--light);
   cursor: pointer;
+  position: relative;
+  transition: background 0.1s;
+}
+
+.item-label input[type="checkbox"]:checked {
+  background: var(--yellow);
+}
+
+.item-label input[type="checkbox"]:checked::after {
+  content: "\2713";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: var(--dark);
+  line-height: 1;
 }
 
 .item-name {
@@ -132,31 +210,43 @@
   background: none;
   border: none;
   color: inherit;
-  font-size: 1.25rem;
+  font-size: 1.8rem;
   line-height: 1;
-  padding: 0.15rem 0.35rem;
-  border-radius: 6px;
+  padding: 0.2rem 0.5rem;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s, background 0.15s;
+  transition: opacity 0.15s, color 0.15s;
 }
 
 .item:hover .delete-btn {
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 .delete-btn:hover {
   opacity: 1 !important;
-  background: var(--delete-hover);
-  color: #ef4444;
+  color: #e00;
 }
 
 .empty-state {
   text-align: center;
-  padding: 1.5rem 0.5rem;
-  font-size: 0.85rem;
-  opacity: 0.35;
+  padding: 2rem 0.5rem;
+  font-size: 1.4rem;
+  opacity: 0.3;
   font-style: italic;
+  height: calc-size(auto);
+  overflow: hidden;
+  transition:
+    height 0.3s ease,
+    opacity 0.3s ease,
+    padding 0.3s ease;
+}
+
+@starting-style {
+  .empty-state {
+    height: 0;
+    opacity: 0;
+    padding-block: 0;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -164,53 +254,54 @@
 /* ------------------------------------------------------------------ */
 .add-item-form {
   display: flex;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  border-top: 1px solid var(--border);
+  gap: 0;
+  border-top: 2.5px solid var(--dark);
 }
 
 .add-item-form input[type="text"] {
   flex: 1;
-  padding: 0.45rem 0.65rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--input-bg);
-  color: inherit;
-  font-size: 0.875rem;
+  padding: 1rem 1.2rem;
+  border: none;
+  background: var(--imGoingToFaint);
+  color: var(--dark);
+  font-size: 1.4rem;
+  font-family: inherit;
   outline: none;
-  transition: border-color 0.2s;
 }
 
 .add-item-form input[type="text"]:focus {
-  border-color: var(--accent);
+  background: #fff9db;
 }
 
 .add-item-form input[type="text"]::placeholder {
-  opacity: 0.4;
+  opacity: 0.35;
 }
 
 .add-item-form button[type="submit"] {
-  padding: 0.45rem 0.75rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--accent);
-  color: #fff;
-  font-size: 1rem;
-  font-weight: 600;
+  padding: 1rem 1.5rem;
+  border: none;
+  border-left: 2.5px solid var(--dark);
+  background: var(--yellow);
+  color: var(--dark);
+  font-size: 2rem;
+  font-weight: 900;
   cursor: pointer;
   line-height: 1;
-  transition: opacity 0.15s;
+  transition: background 0.1s;
+  font-family: inherit;
+  transform: none;
+  box-shadow: none;
 }
 
 .add-item-form button[type="submit"]:hover {
-  opacity: 0.85;
+  background: #e6b200;
 }
 
 /* ------------------------------------------------------------------ */
 /*  Drag-over visual feedback                                         */
 /* ------------------------------------------------------------------ */
-.store-column:has(.item-list:hover) {
-  box-shadow: 0 0 0 2px var(--accent);
+.store-column.drag-over {
+  box-shadow: 6px 6px 0 var(--dark), 10px 10px 0 var(--yellow);
 }
 
 /* ------------------------------------------------------------------ */
@@ -226,29 +317,4 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-/* ------------------------------------------------------------------ */
-/*  CSS custom properties (light / dark)                              */
-/* ------------------------------------------------------------------ */
-:root {
-  --column-bg: #f4f4f5;
-  --item-bg: #ffffff;
-  --item-hover: #e8e8ec;
-  --border: #e0e0e4;
-  --input-bg: #ffffff;
-  --accent: #6366f1;
-  --delete-hover: rgba(239, 68, 68, 0.1);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --column-bg: #1e1e22;
-    --item-bg: #28282e;
-    --item-hover: #32323a;
-    --border: #3a3a42;
-    --input-bg: #1a1a1e;
-    --accent: #818cf8;
-    --delete-hover: rgba(239, 68, 68, 0.15);
-  }
 }
