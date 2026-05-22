@@ -1,73 +1,31 @@
-# React + TypeScript + Vite
+# WebMCP Grocery List
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A demo grocery list app that exposes tools via the [WebMCP](https://developer.chrome.com/docs/ai/webmcp) declarative and imperative APIs. An AI agent can query stores/items, add/delete/move items, toggle purchased status, and manage store columns — all without screen-scraping.
 
-Currently, two official plugins are available:
+> **Note:** WebMCP is an early-stage specification. This currently only works with Chrome 146+ and the [Model Context Tool Inspector](https://chromewebstore.google.com/detail/webmcp-model-context-tool/knkanehcjobalicepcnleoaoblbkllbp) extension. Enable the flag at `chrome://flags/#enable-webmcp-testing`.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+![Screenshot](screenshot.png)
 
-## React Compiler
+## Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install
+pnpm dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## WebMCP Tools
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+**Imperative** (JS API — read-only queries):
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- `get_stores` — list all stores with IDs and item counts
+- `get_all_items` — every item across all stores
+- `get_items_by_store` — items for a specific store
+
+**Declarative** (HTML form API — mutations):
+
+- `add_item` — add a grocery item to a store
+- `delete_item` — remove an item by ID
+- `toggle_purchased` — mark/unmark purchased
+- `move_item` — move an item between stores
+- `add_store` — create a new store column
+- `delete_store` — remove a store and its items
