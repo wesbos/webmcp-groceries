@@ -4,28 +4,22 @@ import "./App.css";
 /* ------------------------------------------------------------------ */
 /*  WebMCP type augmentations (experimental Chrome 146+ API)          */
 /* ------------------------------------------------------------------ */
-type ToolContent = { type: "text"; text: string };
-type ToolResult = { content: ToolContent[] };
-
 interface WebMCPTool {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
   annotations?: Record<string, string>;
-  execute: (args: Record<string, unknown>) => ToolResult;
+  execute: (args: Record<string, unknown>) => string;
 }
 
 interface ModelContext {
-  registerTool(tool: WebMCPTool): void;
-  unregisterTool(name: string): void;
-  provideContext(ctx: { tools: WebMCPTool[] }): void;
-  clearContext(): void;
+  registerTool(tool: WebMCPTool, options?: { signal?: AbortSignal }): void;
 }
 
 declare global {
   interface SubmitEvent {
     agentInvoked?: boolean;
-    respondWith?(promise: Promise<unknown>): void;
+    respondWith?(result: unknown): void;
   }
   interface Navigator {
     modelContext?: ModelContext;
@@ -41,12 +35,10 @@ declare module "react" {
   }
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface InputHTMLAttributes<T> {
-    toolparamtitle?: string;
     toolparamdescription?: string;
   }
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface SelectHTMLAttributes<T> {
-    toolparamtitle?: string;
     toolparamdescription?: string;
   }
 }
@@ -238,100 +230,84 @@ export default function App() {
     const mc = navigator.modelContext;
     if (!mc) return;
 
-    const queryTools: WebMCPTool[] = [
-      {
-        name: "get_stores",
-        description:
-          "Get a list of all stores in the grocery list with their IDs and item counts.",
-        inputSchema: { type: "object", properties: {} },
-        annotations: { readOnlyHint: "true" },
-        execute: () => {
-          const current = storesRef.current;
-          const data = current.map((s) => ({
-            id: s.id,
-            name: s.name,
-            itemCount: s.items.length,
-            purchasedCount: s.items.filter((i) => i.purchased).length,
-          }));
-          return {
-            content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-          };
-        },
-      },
-      {
-        name: "get_all_items",
-        description:
-          "Get every grocery item across all stores, including each item's ID, name, purchased status, and which store it belongs to.",
-        inputSchema: { type: "object", properties: {} },
-        annotations: { readOnlyHint: "true" },
-        execute: () => {
-          const current = storesRef.current;
-          const data = current.flatMap((s) =>
-            s.items.map((i) => ({
-              id: i.id,
-              name: i.name,
-              purchased: i.purchased,
-              storeId: s.id,
-              storeName: s.name,
-            }))
-          );
-          return {
-            content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-          };
-        },
-      },
-      {
-        name: "get_items_by_store",
-        description:
-          "Get all grocery items for a specific store by store ID. Use get_stores first to find the store ID.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            store_id: {
-              type: "string",
-              description: "The ID of the store to get items for",
-            },
-          },
-          required: ["store_id"],
-        },
-        annotations: { readOnlyHint: "true" },
-        execute: (args: Record<string, unknown>) => {
-          const current = storesRef.current;
-          const store = current.find((s) => s.id === args.store_id);
-          if (!store) {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: `Error: Store with id "${args.store_id}" not found.`,
-                },
-              ],
-            };
-          }
-          const data = {
-            storeId: store.id,
-            storeName: store.name,
-            items: store.items.map((i) => ({
-              id: i.id,
-              name: i.name,
-              purchased: i.purchased,
-            })),
-          };
-          return {
-            content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-          };
-        },
-      },
-    ];
+    const controller = new AbortController();
+    const opts = { signal: controller.signal };
 
-    for (const tool of queryTools) {
-      mc.registerTool(tool);
-    }
+    mc.registerTool({
+      name: "get_stores",
+      description:
+        "Get a list of all stores in the grocery list with their IDs and item counts.",
+      inputSchema: { type: "object", properties: {} },
+      annotations: { readOnlyHint: "true" },
+      execute: () => {
+        const current = storesRef.current;
+        const data = current.map((s) => ({
+          id: s.id,
+          name: s.name,
+          itemCount: s.items.length,
+          purchasedCount: s.items.filter((i) => i.purchased).length,
+        }));
+        return JSON.stringify(data, null, 2);
+      },
+    }, opts);
+
+    mc.registerTool({
+      name: "get_all_items",
+      description:
+        "Get every grocery item across all stores, including each item's ID, name, purchased status, and which store it belongs to.",
+      inputSchema: { type: "object", properties: {} },
+      annotations: { readOnlyHint: "true" },
+      execute: () => {
+        const current = storesRef.current;
+        const data = current.flatMap((s) =>
+          s.items.map((i) => ({
+            id: i.id,
+            name: i.name,
+            purchased: i.purchased,
+            storeId: s.id,
+            storeName: s.name,
+          }))
+        );
+        return JSON.stringify(data, null, 2);
+      },
+    }, opts);
+
+    mc.registerTool({
+      name: "get_items_by_store",
+      description:
+        "Get all grocery items for a specific store by store ID. Use get_stores first to find the store ID.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          store_id: {
+            type: "string",
+            description: "The ID of the store to get items for",
+          },
+        },
+        required: ["store_id"],
+      },
+      annotations: { readOnlyHint: "true" },
+      execute: (args: Record<string, unknown>) => {
+        const current = storesRef.current;
+        const store = current.find((s) => s.id === args.store_id);
+        if (!store) {
+          return `Error: Store with id "${args.store_id}" not found.`;
+        }
+        const data = {
+          storeId: store.id,
+          storeName: store.name,
+          items: store.items.map((i) => ({
+            id: i.id,
+            name: i.name,
+            purchased: i.purchased,
+          })),
+        };
+        return JSON.stringify(data, null, 2);
+      },
+    }, opts);
 
     return () => {
-      for (const tool of queryTools) {
-        mc.unregisterTool(tool.name);
-      }
+      controller.abort();
     };
   }, []);
 
@@ -355,31 +331,16 @@ export default function App() {
     const storeId = fd.get("store_id") as string;
     const name = (fd.get("item_name") as string)?.trim();
     if (!storeId || !name) {
-      native.respondWith?.(
-        Promise.resolve({
-          content: [{ type: "text", text: "Error: store_id and item_name are required." }],
-        })
-      );
+      if (native.agentInvoked) native.respondWith?.("Error: store_id and item_name are required.");
       return;
     }
     const store = stores.find((s) => s.id === storeId);
     if (!store) {
-      native.respondWith?.(
-        Promise.resolve({
-          content: [{ type: "text", text: `Error: Store with id "${storeId}" not found.` }],
-        })
-      );
+      if (native.agentInvoked) native.respondWith?.(`Error: Store with id "${storeId}" not found.`);
       return;
     }
     dispatch({ type: "ADD_ITEM", storeId, name });
-    if (native.agentInvoked) {
-      native.respondWith?.(
-        Promise.resolve({
-          content: [{ type: "text", text: `Added "${name}" to ${store.name}.` }],
-        })
-      );
-    }
-    // e.currentTarget.reset();
+    if (native.agentInvoked) native.respondWith?.(`Added "${name}" to ${store.name}.`);
   }
 
   function handleToolDeleteItem(e: FormEvent<HTMLFormElement>) {
@@ -389,27 +350,11 @@ export default function App() {
     const itemId = fd.get("item_id") as string;
     const found = findItem(stores, itemId);
     if (!found) {
-      native.respondWith?.(
-        Promise.resolve({
-          content: [{ type: "text", text: `Error: Item with id "${itemId}" not found.` }],
-        })
-      );
+      if (native.agentInvoked) native.respondWith?.(`Error: Item with id "${itemId}" not found.`);
       return;
     }
     removeItem(itemId);
-    if (native.agentInvoked) {
-      native.respondWith?.(
-        Promise.resolve({
-          content: [
-            {
-              type: "text",
-              text: `Deleted "${found.item.name}" from ${found.store.name}.`,
-            },
-          ],
-        })
-      );
-    }
-    // e.currentTarget.reset();
+    if (native.agentInvoked) native.respondWith?.(`Deleted "${found.item.name}" from ${found.store.name}.`);
   }
 
   function handleToolTogglePurchased(e: FormEvent<HTMLFormElement>) {
@@ -419,28 +364,12 @@ export default function App() {
     const itemId = fd.get("item_id") as string;
     const found = findItem(stores, itemId);
     if (!found) {
-      native.respondWith?.(
-        Promise.resolve({
-          content: [{ type: "text", text: `Error: Item with id "${itemId}" not found.` }],
-        })
-      );
+      if (native.agentInvoked) native.respondWith?.(`Error: Item with id "${itemId}" not found.`);
       return;
     }
     dispatch({ type: "TOGGLE_PURCHASED", itemId });
     const newStatus = !found.item.purchased ? "purchased" : "not purchased";
-    if (native.agentInvoked) {
-      native.respondWith?.(
-        Promise.resolve({
-          content: [
-            {
-              type: "text",
-              text: `Marked "${found.item.name}" as ${newStatus}.`,
-            },
-          ],
-        })
-      );
-    }
-    // e.currentTarget.reset();
+    if (native.agentInvoked) native.respondWith?.(`Marked "${found.item.name}" as ${newStatus}.`);
   }
 
   function handleToolMoveItem(e: FormEvent<HTMLFormElement>) {
@@ -452,27 +381,11 @@ export default function App() {
     const found = findItem(stores, itemId);
     const targetStore = stores.find((s) => s.id === targetStoreId);
     if (!found || !targetStore) {
-      native.respondWith?.(
-        Promise.resolve({
-          content: [{ type: "text", text: "Error: Item or target store not found." }],
-        })
-      );
+      if (native.agentInvoked) native.respondWith?.("Error: Item or target store not found.");
       return;
     }
     dispatch({ type: "MOVE_ITEM", itemId, targetStoreId });
-    if (native.agentInvoked) {
-      native.respondWith?.(
-        Promise.resolve({
-          content: [
-            {
-              type: "text",
-              text: `Moved "${found.item.name}" from ${found.store.name} to ${targetStore.name}.`,
-            },
-          ],
-        })
-      );
-    }
-    // e.currentTarget.reset();
+    if (native.agentInvoked) native.respondWith?.(`Moved "${found.item.name}" from ${found.store.name} to ${targetStore.name}.`);
   }
 
   function handleToolAddStore(e: FormEvent<HTMLFormElement>) {
@@ -481,22 +394,11 @@ export default function App() {
     const fd = new FormData(e.currentTarget);
     const name = (fd.get("store_name") as string)?.trim();
     if (!name) {
-      native.respondWith?.(
-        Promise.resolve({
-          content: [{ type: "text", text: "Error: store_name is required." }],
-        })
-      );
+      if (native.agentInvoked) native.respondWith?.("Error: store_name is required.");
       return;
     }
     dispatch({ type: "ADD_STORE", name });
-    if (native.agentInvoked) {
-      native.respondWith?.(
-        Promise.resolve({
-          content: [{ type: "text", text: `Created store "${name}".` }],
-        })
-      );
-    }
-    // e.currentTarget.reset();
+    if (native.agentInvoked) native.respondWith?.(`Created store "${name}".`);
   }
 
   function handleToolDeleteStore(e: FormEvent<HTMLFormElement>) {
@@ -506,27 +408,11 @@ export default function App() {
     const storeId = fd.get("store_id") as string;
     const store = stores.find((s) => s.id === storeId);
     if (!store) {
-      native.respondWith?.(
-        Promise.resolve({
-          content: [{ type: "text", text: `Error: Store with id "${storeId}" not found.` }],
-        })
-      );
+      if (native.agentInvoked) native.respondWith?.(`Error: Store with id "${storeId}" not found.`);
       return;
     }
     dispatch({ type: "DELETE_STORE", storeId });
-    if (native.agentInvoked) {
-      native.respondWith?.(
-        Promise.resolve({
-          content: [
-            {
-              type: "text",
-              text: `Deleted store "${store.name}" and its ${store.items.length} item(s).`,
-            },
-          ],
-        })
-      );
-    }
-    // e.currentTarget.reset();
+    if (native.agentInvoked) native.respondWith?.(`Deleted store "${store.name}" and its ${store.items.length} item(s).`);
   }
 
   /* ---- Build a flat list of all items for the agent context ---- */
